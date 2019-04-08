@@ -1,0 +1,121 @@
+train.py:
+
+#top_k：最大顶层的k值
+#k1：第一层的k值
+#dev：验证集的大小
+#batch_size：batch的大小
+#n——epochs：epoch的次数
+#sentence_length：句子的长度
+#num_class：分类的种类
+#embed_dim：嵌入维度
+#evaluate_every：没多少个点验证一次
+#checkpoint_ervery：与上一个元素的作用差不多
+#num_checkpoints：无效数据
+#lr：无效数据
+embed_dim = 100
+ws = [7, 5]
+top_k = 4
+k1 = 19
+num_filters = [6, 14]
+dev = 300
+batch_size = 50
+n_epochs = 30
+num_hidden = 100
+sentence_length = 37
+num_class = 6
+lr = 0.01
+evaluate_every = 100
+checkpoint_every = 100
+num_checkpoints = 5
+
+#导入数据
+x_, y_, vocabulary, vocabulary_inv, test_size = dataUtils.load_data()
+
+# Randomly shuffle data
+#x_:长度为5952的np.array。（包含5452个训练集和500个测试集）其中每个句子都是padding成长度为37的list（padding的索引为0）
+#y_:长度为5952的np.array。每一个都是长度为6的onehot编码表示其类别属性
+#vocabulary：长度为8789的字典，说明语料库中一共包含8789各单词。key是单词，value是索引
+#vocabulary_inv：长度为8789的list，是按照单词出现次数进行排列。依次为：<PAD?>,\\?,the,what,is,of,in,a....
+#test_size:500,测试集大小
+x, x_test = x_[:-test_size], x_[-test_size:]
+y, y_test = y_[:-test_size], y_[-test_size:]
+
+#x_shuffled和y_shuffled相当于把x和y重新排列了一下
+shuffle_indices = np.random.permutation(np.arange(len(y)))
+x_shuffled = x[shuffle_indices]
+y_shuffled = y[shuffle_indices]
+
+#赋值x_train，y_train和验证集
+x_train, x_dev = x_shuffled[:-dev], x_shuffled[-dev:]
+y_train, y_dev = y_shuffled[:-dev], y_shuffled[-dev:]
+
+#函数placeholder用于定义过程，在执行的时候再赋具体的值，设置了三个变量的类型
+sent = tf.placeholder(tf.int64, [None, sentence_length])
+y = tf.placeholder(tf.float64, [None, num_class])
+dropout_keep_prob = tf.placeholder(tf.float32, name="dropout")
+
+#嵌入层，其中name_scope是为了更好的管理参数名
+with tf.name_scope("embedding_layer"):
+    W = tf.Variable(tf.random_uniform([len(vocabulary), embed_dim], -1.0, 1.0), name="embed_W")
+    #tf.nn.embedding_lookup函数的用法主要是选取一个张量里面索引对应的元素
+    sent_embed = tf.nn.embedding_lookup(W, sent)
+    #input_x = tf.reshape(sent_embed, [batch_size, -1, embed_dim, 1])
+    #增加一个维度，四个维度表示的意思分别是[batch_size, sentence_length, embed_dim, 1]
+    input_x = tf.expand_dims(sent_embed, -1)
+
+#初始化w,b
+W1 = init_weights([ws[0], embed_dim, 1, num_filters[0]], "W1")
+b1 = tf.Variable(tf.constant(0.1, shape=[num_filters[0], embed_dim]), "b1")
+
+#增加int()
+W2 = init_weights([ws[1], int(embed_dim/2), num_filters[0], num_filters[1]], "W2")
+b2 = tf.Variable(tf.constant(0.1, shape=[num_filters[1], embed_dim]), "b2")
+
+#增加int
+Wh = init_weights([int(top_k*embed_dim*num_filters[1]/4), num_hidden], "Wh")
+bh = tf.Variable(tf.constant(0.1, shape=[num_hidden]), "bh")
+
+Wo = init_weights([num_hidden, num_class], "Wo")
+
+#模型建立
+model = DCNN(batch_size, sentence_length, num_filters, embed_dim, top_k, k1)
+out = model.DCNN(input_x, W1, W2, b1, b2, k1, top_k, Wh, bh, Wo, dropout_keep_prob)
+
+#交叉熵计算cost
+with tf.name_scope("cost"):
+    cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=out, labels=y))
+
+
+
+
+
+
+
+dataUtils.py
+
+def load_data()
+	#导入数据
+	sentences, labels, test_size = load_data_and_labels()
+	#使用<PAD/>填充句子
+	sentences_padded = pad_sentences(sentences)
+	#vocabulary：dict类型，返回词和编号，8789个
+	#vocabulary_inv：list类型，返回词8789个，其中索引对应编号，其中0表示</PAD>
+	vocabulary, vocabulary_inv = build_vocab(sentences_padded)
+	#将sentences和labels变成vocabulary对应的序列
+	x, y = build_input_data(sentences_padded, labels, vocabulary)
+	return [x, y, vocabulary, vocabulary_inv, test_size]
+
+def load_data_and_labels():
+	#x_text：将测试集的大写改成小写，取出一些符号，然后将一个句子放在一个list中（每个词作为元素）
+	#y：每个句子的类型，其中每个label是一个序列，第几个元素为1，label值就为多少
+	#test：测试集的大小
+
+def pad_sentences(sentences, padding_word="<PAD/>"):
+	#使用<PAD/>填充句子
+
+def build_vocab(sentences):
+	#vocabulary：dict类型，返回词和编号，8789个
+	#vocabulary_inv：list类型，返回词8789个，其中索引对应编号
+
+def build_input_data(sentences, labels, vocabulary):
+	#将sentences和labels变成vocabulary对应的序列
